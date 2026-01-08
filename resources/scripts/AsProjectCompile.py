@@ -73,7 +73,7 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
                 pipCommand = (pviTransferPath + ' -silent "' + pilPath + '"')
                 result = subprocess.run(pipCommand, cwd=__projectPath, capture_output=True, text=True)
                 PrintErrorsAndWarnings(result.stdout.splitlines())
-                shutil.make_archive("PIP", 'zip', os.path.join(__projectPath, "PIP"))
+                shutil.make_archive(f"{Project._configurations[config]._name}-PIP", 'zip', os.path.join(__projectPath, "PIP"))
                 
     return buildResult
 
