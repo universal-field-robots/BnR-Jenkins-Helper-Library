@@ -26,7 +26,7 @@ import subprocess
 # Regex to match error/warning lines with file and line info
 # Matches to the form <file>(<pos>) : <result> <code>: <message>
 annotation_regex = re.compile(
-    r'(?P<file>.*?)\((?P<pos>.*?)\) : (?i:(?P<result>error|warning)) (?P<code>\d+): (?P<message>.*)')
+    r'(?P<file>.*?)\((?P<pos>.*?)\).*?(?i:(?P<result>error|warning)) (?P<code>\d+).*?:(?P<message>.*)')
 
 # Fallback regex to match "Error 2132: ..." or "Warning 1234: ..."
 simple_regex = re.compile(r'.*(?i:(?P<result>error|warning)) \d*:.*')
@@ -39,18 +39,18 @@ def PrintErrorsAndWarnings(output, errors=0, warnings=0):
     # Regex to match error/warning lines with file and line info
     # Matches to the form <file>(<pos>) : <result> <code>: <message>
 
-    for line in output.splitlines():
-        print(line)
+    for line in output:
+        print(line.strip())
         matches = re.search(annotation_regex, line)
         if matches:
-            result = matches.group('result').lower()
-            file_path = matches.group('file')
-            pos = matches.group('pos')
+            result = matches.group('result').lower().strip()
+            file_path = matches.group('file').strip()
+            pos = matches.group('pos').strip()
             message = matches.group('message').strip()
             line_col = re.search(line_column_regex, pos)
             if line_col:
-                line = line_col.group('line')
-                column = line_col.group('column')
+                line = line_col.group('line').strip()
+                column = line_col.group('column').strip()
                 print(f'::{result} file={file_path},line={line},col={column}::{message}')
             else:
                 print(f'::{result} file={file_path}:: At {pos}. {message}')
@@ -62,7 +62,7 @@ def PrintErrorsAndWarnings(output, errors=0, warnings=0):
             # Fallback for lines that match simple regex but not annotation format
             simple_matches = re.search(simple_regex, line)
             if simple_matches:
-                result = simple_matches.group('result').lower()
+                result = simple_matches.group('result').lower().strip()
                 print(f'::{result}::{line.strip()}')
                 if result == 'error':
                     errors += 1
@@ -85,20 +85,26 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
         if (Configuration == Project._configurations[config]._name) or (Configuration == 'all'):
             standard_commands = f'{os.path.join(__compileAsPath, "Bin-en", "BR.AS.Build.exe")} "{os.path.join(__projectPath, Project.projectName)}" -c {Project._configurations[config]._name} -t "{Project._configurations[config].TempDirectory()}" -o "{Project._configurations[config].BinariesDirectory()}"'
             if (NoClean == False):
-                print(f'Cleaning Configuration: {Project._configurations[config]._name}')
+                print(f'Cleaning configuration {Project._configurations[config]._name}')
                 result = subprocess.run(standard_commands + ' -cleanAll', cwd=__projectPath, capture_output=True, text=True)
-
+                print(f'Cleaning configuration {Project._configurations[config]._name} complete.')
             errors = 0
             warnings = 0
+            print(f'Building configuration {Project._configurations[config]._name}.')
             with subprocess.Popen(standard_commands + ' -buildMode "Build" -buildRUCPackage', cwd=__projectPath, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as result:
                 for output in result.stdout:
-                    PrintErrorsAndWarnings(output, errors, warnings)
+                    PrintErrorsAndWarnings([output], errors, warnings)
             result.wait()
 
-            buildResult.append([Project._configurations[config]._name, result.returncode, errors, warnings])
-            print(f'Build Result {Project._configurations[config]._name} = {result.returncode}')
+            if result.returncode == 0 or result.returncode == 1:
+                print(f'Building configuration {Project._configurations[config]._name} complete with {warnings} warning(s).')
+            else:
+                print(f'Building configuration {Project._configurations[config]._name} failed with {errors} error(s).')
 
-            if (BuildPIP):
+            buildResult.append([Project._configurations[config]._name, result.returncode, errors, warnings])
+
+            if (BuildPIP and (result.returncode == 0 or result.returncode == 1)):
+                print(f'Creating PIP for configuration {Project._configurations[config]._name}')
                 #create PIP
                 pilPath = os.path.join(__projectPath, "CreatePIP.pil")
                 pilContents = 'CreatePIP "' + os.path.join(__projectPath, Project._configurations[config].BinariesDirectory(), Project._configurations[config]._name, Project._configurations[config]._cpuName, 'RUCPackage', 'RUCPackage.zip') + '", "InstallMode=Consistent InstallRestriction=AllowUpdatesWithoutDataLoss KeepPVValues=1 ExecuteInitExit=0 IgnoreVersion=1 AllowDowngrade=0", "Default", "SupportLegacyAR=1", "DestinationDirectory=\'' + os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP") + '\'"'
@@ -110,6 +116,8 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
                 result = subprocess.run(pipCommand, cwd=__projectPath, capture_output=True, text=True)
                 PrintErrorsAndWarnings(result.stdout.splitlines())
                 shutil.make_archive(os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP"), 'zip', os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP"))
+                print(f'Creating PIP for configuration {Project._configurations[config]._name} complete.')
+
     return buildResult
 
 def parse_bool(s: str) -> bool:
@@ -135,10 +143,13 @@ def main() -> None:
         compileResult = int(result[1]) if (compileResult < int(result[1])) else compileResult
         maxWarnings = result[3] if ((result[3] > maxWarnings) and (args.maxWarnings != -1)) else maxWarnings
 
-    if (compileResult == 1):
-        compileResult = 1 if ((int(args.maxWarnings) > 0) and (maxWarnings > int(args.maxWarnings))) else 0
+    if (compileResult == 0):
+        print('Configurations built successfully with no errors.')
+    elif (compileResult == 1):
+        print('Configurations built successfully with warnings.')
+    else:
+        print('Build failed with errors.')
 
-    print('Build Result = ' + str(compileResult))
     sys.exit(compileResult)
 
 if __name__ == '__main__':
