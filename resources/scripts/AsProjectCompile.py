@@ -66,7 +66,7 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
             if (BuildPIP):
                 #create PIP
                 pilPath = os.path.join(__projectPath, "CreatePIP.pil")
-                pilContents = 'CreatePIP "' + os.path.join(__projectPath, Project._configurations[config].BinariesDirectory(), Project._configurations[config]._name, Project._configurations[config]._cpuName, 'RUCPackage', 'RUCPackage.zip') + '", "InstallMode=Consistent InstallRestriction=AllowUpdatesWithoutDataLoss KeepPVValues=1 ExecuteInitExit=0 IgnoreVersion=1 AllowDowngrade=0", "Default", "SupportLegacyAR=1", "DestinationDirectory=\'' + os.path.join(__projectPath, 'PIP') + '\'"'
+                pilContents = 'CreatePIP "' + os.path.join(__projectPath, Project._configurations[config].BinariesDirectory(), Project._configurations[config]._name, Project._configurations[config]._cpuName, 'RUCPackage', 'RUCPackage.zip') + '", "InstallMode=Consistent InstallRestriction=AllowUpdatesWithoutDataLoss KeepPVValues=1 ExecuteInitExit=0 IgnoreVersion=1 AllowDowngrade=0", "Default", "SupportLegacyAR=1", "DestinationDirectory=\'' + os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP") + '\'"'
                 pilFile = open(pilPath,"w")
                 pilFile.write(pilContents)
                 pilFile.close()
@@ -74,7 +74,7 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
                 pipCommand = (pviTransferPath + ' -silent "' + pilPath + '"')
                 result = subprocess.run(pipCommand, cwd=__projectPath, capture_output=True, text=True)
                 PrintErrorsAndWarnings(result.stdout.splitlines())
-                shutil.make_archive(f"{Project._configurations[config]._name}-PIP", 'zip', os.path.join(__projectPath, "PIP"))
+                shutil.make_archive(os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP"), 'zip', os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP"))
                 
     return buildResult
 
