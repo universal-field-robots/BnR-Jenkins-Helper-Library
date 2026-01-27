@@ -22,15 +22,52 @@ import tempfile
 import re
 import subprocess
 
-def PrintErrorsAndWarnings(output):
-    regex = re.compile(r'.*(?P<result>error|warning) \d*:.*')
+
+# Regex to match error/warning lines with file and line info
+# Matches to the form <file>(<pos>) : <result> <code>: <message>
+annotation_regex = re.compile(
+    r'(?P<file>.*?)\((?P<pos>.*?)\) : (?i:(?P<result>error|warning)) (?P<code>\d+): (?P<message>.*)')
+
+# Fallback regex to match "Error 2132: ..." or "Warning 1234: ..."
+simple_regex = re.compile(r'.*(?i:(?P<result>error|warning)) \d*:.*')
+
+# Line column matching regex
+line_column_regex = re.compile(r'Ln: (?P<line>\d+), Col: (?P<column>\d+)')
+
+
+def PrintErrorsAndWarnings(output, errors=0, warnings=0):
+    # Regex to match error/warning lines with file and line info
+    # Matches to the form <file>(<pos>) : <result> <code>: <message>
+
     for l in output:
-        matches = re.search(regex, l)
-        if (matches != None):
-            if (matches.group('result')) == 'error':
-                print(f'\033[91m {l} \033[0m')
-            elif (matches.group('result')) == 'warning':
-                print(f'\033[92m {l} \033[0m')
+        matches = re.search(annotation_regex, l)
+        if matches:
+            result = matches.group('result').lower()
+            file_path = matches.group('file')
+            pos = matches.group('pos')
+            message = matches.group('message').strip()
+            line_col = re.search(line_column_regex, pos)
+            if line_col:
+                line = line_col.group('line')
+                column = line_col.group('column')
+                print(f'::{result} file={file_path},line={line},col={column}::{message}')
+            else:
+                print(f'::{result} file={file_path}:: At {pos}. {message}')
+            if result == 'error':
+                errors += 1
+            elif result == 'warning':
+                warnings += 1
+        else:
+            # Fallback for lines that match simple regex but not annotation format
+            simple_matches = re.search(simple_regex, l)
+            if simple_matches:
+                result = simple_matches.group('result').lower()
+                print(f'::{result}::{l.strip()}')
+                if result == 'error':
+                    errors += 1
+                elif result == 'warning':
+                    warnings += 1
+
 
 def Compile(Project, Configuration, BuildPIP, NoClean):
     __projectPath = Project._projectDir
@@ -45,27 +82,25 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
 
     for config in Project._configurations:        
         if (Configuration == Project._configurations[config]._name) or (Configuration == 'all'):
+            print(f'Building Configuration: {Project._configurations[config]._name}')
             standard_commands = f'{os.path.join(__compileAsPath, "Bin-en", "BR.AS.Build.exe")} "{os.path.join(__projectPath, Project.projectName)}" -c {Project._configurations[config]._name} -t "{Project._configurations[config].TempDirectory()}" -o "{Project._configurations[config].BinariesDirectory()}"'
             if (NoClean == False):
                 result = subprocess.run(standard_commands + ' -cleanAll', cwd=__projectPath, capture_output=True, text=True)
-            
-            result = subprocess.run(standard_commands + ' -buildMode "Build" -buildRUCPackage', capture_output=True, text=True)
+
             errors = 0
             warnings = 0
-            output = result.stdout.splitlines()
-            r = regex.match(output[-2])
-            if (r != None):
-                errors = int(r.group(1))
-                warnings = int(r.group(2))
-                if (errors > 0) or (warnings > 0):
-                    PrintErrorsAndWarnings(output)
+            with subprocess.Popen(standard_commands + ' -buildMode "Build" -buildRUCPackage', cwd=__projectPath, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as result:
+                for line in result.stdout:
+                    PrintErrorsAndWarnings(line, errors, warnings)
+            result.wait()
+
             buildResult.append([Project._configurations[config]._name, result.returncode, errors, warnings])
             print(f'Build Result {Project._configurations[config]._name} = {result.returncode}')
 
             if (BuildPIP):
                 #create PIP
                 pilPath = os.path.join(__projectPath, "CreatePIP.pil")
-                pilContents = 'CreatePIP "' + os.path.join(__projectPath, Project._configurations[config].BinariesDirectory(), Project._configurations[config]._name, Project._configurations[config]._cpuName, 'RUCPackage', 'RUCPackage.zip') + '", "InstallMode=Consistent InstallRestriction=AllowUpdatesWithoutDataLoss KeepPVValues=1 ExecuteInitExit=0 IgnoreVersion=1 AllowDowngrade=0", "Default", "SupportLegacyAR=1", "DestinationDirectory=\'' + os.path.join(__projectPath, 'PIP') + '\'"'
+                pilContents = 'CreatePIP "' + os.path.join(__projectPath, Project._configurations[config].BinariesDirectory(), Project._configurations[config]._name, Project._configurations[config]._cpuName, 'RUCPackage', 'RUCPackage.zip') + '", "InstallMode=Consistent InstallRestriction=AllowUpdatesWithoutDataLoss KeepPVValues=1 ExecuteInitExit=0 IgnoreVersion=1 AllowDowngrade=0", "Default", "SupportLegacyAR=1", "DestinationDirectory=\'' + os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP") + '\'"'
                 pilFile = open(pilPath,"w")
                 pilFile.write(pilContents)
                 pilFile.close()
@@ -73,7 +108,7 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
                 pipCommand = (pviTransferPath + ' -silent "' + pilPath + '"')
                 result = subprocess.run(pipCommand, cwd=__projectPath, capture_output=True, text=True)
                 PrintErrorsAndWarnings(result.stdout.splitlines())
-                shutil.make_archive("PIP", 'zip', os.path.join(__projectPath, "PIP"))
+                shutil.make_archive(os.path.join(__projectPath, f"{Project._configurations[config]._name} -PIP"), 'zip', os.path.join(__projectPath, f"{Project._configurations[config]._name} -PIP"))
     return buildResult
 
 def parse_bool(s: str) -> bool:
