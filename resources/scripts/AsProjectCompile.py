@@ -45,6 +45,7 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
 
     for config in Project._configurations:        
         if (Configuration == Project._configurations[config]._name) or (Configuration == 'all'):
+            print(f'Building Configuration: {Project._configurations[config]._name}')
             standard_commands = f'{os.path.join(__compileAsPath, "Bin-en", "BR.AS.Build.exe")} "{os.path.join(__projectPath, Project.projectName)}" -c {Project._configurations[config]._name} -t "{Project._configurations[config].TempDirectory()}" -o "{Project._configurations[config].BinariesDirectory()}"'
             if (NoClean == False):
                 result = subprocess.run(standard_commands + ' -cleanAll', cwd=__projectPath, capture_output=True, text=True)
