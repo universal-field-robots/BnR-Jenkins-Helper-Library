@@ -39,8 +39,9 @@ def PrintErrorsAndWarnings(output, errors=0, warnings=0):
     # Regex to match error/warning lines with file and line info
     # Matches to the form <file>(<pos>) : <result> <code>: <message>
 
-    for l in output:
-        matches = re.search(annotation_regex, l)
+    for line in output.splitlines():
+        print(line)
+        matches = re.search(annotation_regex, line)
         if matches:
             result = matches.group('result').lower()
             file_path = matches.group('file')
@@ -59,10 +60,10 @@ def PrintErrorsAndWarnings(output, errors=0, warnings=0):
                 warnings += 1
         else:
             # Fallback for lines that match simple regex but not annotation format
-            simple_matches = re.search(simple_regex, l)
+            simple_matches = re.search(simple_regex, line)
             if simple_matches:
                 result = simple_matches.group('result').lower()
-                print(f'::{result}::{l.strip()}')
+                print(f'::{result}::{line.strip()}')
                 if result == 'error':
                     errors += 1
                 elif result == 'warning':
@@ -82,16 +83,16 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
 
     for config in Project._configurations:        
         if (Configuration == Project._configurations[config]._name) or (Configuration == 'all'):
-            print(f'Building Configuration: {Project._configurations[config]._name}')
             standard_commands = f'{os.path.join(__compileAsPath, "Bin-en", "BR.AS.Build.exe")} "{os.path.join(__projectPath, Project.projectName)}" -c {Project._configurations[config]._name} -t "{Project._configurations[config].TempDirectory()}" -o "{Project._configurations[config].BinariesDirectory()}"'
             if (NoClean == False):
+                print(f'Cleaning Configuration: {Project._configurations[config]._name}')
                 result = subprocess.run(standard_commands + ' -cleanAll', cwd=__projectPath, capture_output=True, text=True)
 
             errors = 0
             warnings = 0
             with subprocess.Popen(standard_commands + ' -buildMode "Build" -buildRUCPackage', cwd=__projectPath, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as result:
-                for line in result.stdout:
-                    PrintErrorsAndWarnings(line, errors, warnings)
+                for output in result.stdout:
+                    PrintErrorsAndWarnings(output, errors, warnings)
             result.wait()
 
             buildResult.append([Project._configurations[config]._name, result.returncode, errors, warnings])
@@ -108,7 +109,7 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
                 pipCommand = (pviTransferPath + ' -silent "' + pilPath + '"')
                 result = subprocess.run(pipCommand, cwd=__projectPath, capture_output=True, text=True)
                 PrintErrorsAndWarnings(result.stdout.splitlines())
-                shutil.make_archive(os.path.join(__projectPath, f"{Project._configurations[config]._name} -PIP"), 'zip', os.path.join(__projectPath, f"{Project._configurations[config]._name} -PIP"))
+                shutil.make_archive(os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP"), 'zip', os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP"))
     return buildResult
 
 def parse_bool(s: str) -> bool:
