@@ -143,13 +143,6 @@ def main() -> None:
         compileResult = int(result[1]) if (compileResult < int(result[1])) else compileResult
         maxWarnings = result[3] if ((result[3] > maxWarnings) and (args.maxWarnings != -1)) else maxWarnings
 
-    if (compileResult == 0):
-        print('Configurations built successfully with no errors.')
-    elif (compileResult == 1):
-        print('Configurations built successfully with warnings.')
-    else:
-        print('Build failed with errors.')
-
     sys.exit(compileResult)
 
 if __name__ == '__main__':
