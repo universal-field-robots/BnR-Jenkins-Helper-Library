@@ -39,6 +39,9 @@ def PrintErrorsAndWarnings(output, errors=0, warnings=0):
     # Regex to match error/warning lines with file and line info
     # Matches to the form <file>(<pos>) : <result> <code>: <message>
 
+    errors = 0
+    warnings = 0
+
     for line in output:
         print(line.strip())
         matches = re.search(annotation_regex, line)
@@ -68,6 +71,7 @@ def PrintErrorsAndWarnings(output, errors=0, warnings=0):
                     errors += 1
                 elif result == 'warning':
                     warnings += 1
+    return errors, warnings
 
 
 def Compile(Project, Configuration, BuildPIP, NoClean):
@@ -93,13 +97,13 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
             print(f'Building configuration {Project._configurations[config]._name}.')
             with subprocess.Popen(standard_commands + ' -buildMode "Build" -buildRUCPackage', cwd=__projectPath, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as result:
                 for output in result.stdout:
-                    PrintErrorsAndWarnings([output], errors, warnings)
+                    errors, warnings = PrintErrorsAndWarnings([output], errors, warnings)
             result.wait()
 
             if result.returncode == 0 or result.returncode == 1:
                 print(f'Building configuration {Project._configurations[config]._name} complete with {warnings} warning(s).')
             else:
-                print(f'Building configuration {Project._configurations[config]._name} failed with {errors} error(s).')
+                print(f'Building configuration {Project._configurations[config]._name} failed with {errors} error(s) and {warnings} warning(s).')
 
             buildResult.append([Project._configurations[config]._name, result.returncode, errors, warnings])
 
