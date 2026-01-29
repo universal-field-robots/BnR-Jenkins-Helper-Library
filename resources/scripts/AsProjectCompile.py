@@ -119,7 +119,7 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
                 pipCommand = (pviTransferPath + ' -silent "' + pilPath + '"')
                 result = subprocess.run(pipCommand, cwd=__projectPath, capture_output=True, text=True)
                 PrintErrorsAndWarnings(result.stdout.splitlines())
-                shutil.make_archive(os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP"), 'zip', os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP"))
+                shutil.make_archive(os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP-v{Project._configurations[config]._configVersion}"), 'zip', os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP"))
                 print(f'Creating PIP for configuration {Project._configurations[config]._name} complete.')
 
     return buildResult

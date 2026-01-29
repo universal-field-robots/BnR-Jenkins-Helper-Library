@@ -257,6 +257,7 @@ class ASConfiguration:
         self.__ioMapFile = os.path.join(directory, self._cpuName, 'IoMap.iom')
         self.findIoModules()
         self.readIoMapp()
+        self.readConfigVersion()
         self._version = version
         #print ('added ' + name)
 
@@ -272,6 +273,10 @@ class ASConfiguration:
         modules = [module for module in ET.parse(os.path.join(self._directory, 'Hardware.hw')).getroot().findall(IoModule.Namespace() + 'Module') if IoModule.isIoModule(module.get('Type'))]
         for m in modules:
             self._modules.append(IoModule(m.get('Name')))
+
+    def readConfigVersion(self):
+        hardware = open(os.path.join(self._directory, 'Hardware.hw')).read()
+        self._configVersion = str(re.findall(r'ID.*?=.*?"ConfigVersion".*?Value.*?=.*?"([\d\.]*)"', hardware)[0])
 
     def readCpuName(self):
         file = os.path.join(self._directory, 'Config.pkg')
