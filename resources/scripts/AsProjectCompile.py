@@ -111,7 +111,7 @@ def Compile(Project, Configuration, BuildPIP, NoClean):
                 print(f'Creating PIP for configuration {Project._configurations[config]._name}')
                 #create PIP
                 pilPath = os.path.join(__projectPath, "CreatePIP.pil")
-                pilContents = 'CreatePIP "' + os.path.join(__projectPath, Project._configurations[config].BinariesDirectory(), Project._configurations[config]._name, Project._configurations[config]._cpuName, 'RUCPackage', 'RUCPackage.zip') + '", "InstallMode=ForceReboot InstallRestriction=AllowInitialInstallation KeepPVValues=1 ExecuteInitExit=0 IgnoreVersion=1 AllowDowngrade=0", "Default", "SupportLegacyAR=1", "DestinationDirectory=\'' + os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP") + '\'"'
+                pilContents = 'CreatePIP "' + os.path.join(__projectPath, Project._configurations[config].BinariesDirectory(), Project._configurations[config]._name, Project._configurations[config]._cpuName, 'RUCPackage', 'RUCPackage.zip') + '", "InstallMode=ForceReboot InstallRestriction=AllowInitialInstallation KeepPVValues=1 ExecuteInitExit=0 IgnoreVersion=0 AllowDowngrade=0", "Default", "SupportLegacyAR=1", "DestinationDirectory=\'' + os.path.join(__projectPath, f"{Project._configurations[config]._name}-PIP") + '\'"'
                 pilFile = open(pilPath,"w")
                 pilFile.write(pilContents)
                 pilFile.close()
