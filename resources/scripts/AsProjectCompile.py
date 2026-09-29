@@ -12,8 +12,6 @@ Example: c:/AsProjectCompile.py --project "C:/projects/CICD/MachineWVD" --maxwar
 
 """
 
-from readchar import config
-
 import InstalledAS
 import ASProject
 import os
@@ -182,11 +180,7 @@ def main() -> None:
 
     project = ASProject.ASProject(args.projectDir)
     results = Compile(project, args.BuildPIP)
-    if results.return_code == 3:
-        sys.exit(3)
-    if results.warnings > args.maxWarnings and args.maxWarnings != -1:
-        sys.exit(3)
-    if results.return_code == 1:
+    if results.return_code == 3 or (results.warnings > args.maxWarnings and args.maxWarnings != -1):
         sys.exit(1)
     else:
         sys.exit(0)
