@@ -132,6 +132,7 @@ def Compile(Project: ASProject.ASProject, BuildPIP: bool) -> CompilationResult:
             __projectPath, f"{Project._configurations[config]._name}-PIP")
         pilPath = os.path.join(__projectPath, "CreatePIP.pil")
         # Create a PIP using PVITransfer
+        # TODO: Check that these are the best install modes and restrictions
         pilContents = 'OfflineUpdate "' + rucPackagePath + '", "Network", "InstallMode=ForceReboot InstallRestriction=AllowInitialInstallation KeepPVValues=1 ExecuteInitExit=0 IgnoreVersion=1 AllowDowngrade=0", "Default", "DestinationDirectory=\'' + pipPath + '\'"'
         pilFile = open(pilPath, "w", encoding='utf-8')
         pilFile.write(pilContents)
@@ -175,7 +176,7 @@ def main() -> None:
                         dest='maxWarnings', required=False, default=-1)
     parser.add_argument(
         '-b', '--buildpip', help='Builds the Project Installation Package', dest='BuildPIP',
-        required=False, default=False, type=parse_bool)
+        required=False, action='store_true')
     args = parser.parse_args()
 
     project = ASProject.ASProject(args.projectDir)
