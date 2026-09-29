@@ -56,6 +56,10 @@ class CompilationResult:
 def PrintErrorsAndWarnings(output: list[str]) -> None:
     """Prints errors and warnings in a format that GitHub Actions can recognize as annotations."""
     for line in output:
+        # Always print the line to console for visibility
+        print(line.strip())
+
+        # Now try to interpret for GitHub Actions annotations
         annotation_matches = re.search(annotation_regex, line)
         fallback_matches = re.search(fallback_regex, line)
         simple_matches = re.search(simple_regex, line)
@@ -64,33 +68,37 @@ def PrintErrorsAndWarnings(output: list[str]) -> None:
             file_path = annotation_matches.group('file').strip()
             pos = annotation_matches.group('pos').strip()
             message = annotation_matches.group('message').strip()
+            code = annotation_matches.group('code').strip()
             line_col = re.search(line_column_regex, pos)
+            # Treat security risks as warnings for GitHub Actions
+            annotation_type = result if result in ['error', 'warning'] else 'warning'
             if line_col:
                 line = line_col.group('line').strip()
                 column = line_col.group('column').strip()
-                print(f'::{result} file={file_path},line={line},col={column}::{message}')
+                print(
+                    f'::{annotation_type} file={file_path},line={line},col={column}::{result} {code} - {message}')
             else:
-                print(f'::{result} file={file_path}:: At {pos}. {message}')
+                print(f'::{annotation_type} file={file_path}:: At {pos}. {result} {code} - {message}')
         elif fallback_matches:
-
             result = fallback_matches.group('result').lower().strip()
             file_path = fallback_matches.group('file').strip()
             pos = fallback_matches.group('pos').strip()
             message = fallback_matches.group('message').strip()
             line_col = re.search(line_column_regex, pos)
+            # Treat security risks as warnings for GitHub Actions
+            annotation_type = result if result in ['error', 'warning'] else 'warning'
             if line_col:
                 line = line_col.group('line').strip()
                 column = line_col.group('column').strip()
-                print(f'::{result} file={file_path},line={line},col={column}::{message}')
+                print(
+                    f'::{annotation_type} file={file_path},line={line},col={column}::{result} - {message}')
             else:
-                print(f'::{result} file={file_path}:: At {pos}. {message}')
+                print(f'::{annotation_type} file={file_path}:: At {pos}. {result} - {message}')
         elif simple_matches:
             # Fallback for lines that match simple regex but not annotation format
             result = simple_matches.group('result').lower().strip()
-            print(f'::{result}::{line.strip()}')
-        else:
-            # If no matches, print the line as is
-            print(line.strip())
+            annotation_type = result if result in ['error', 'warning'] else 'warning'
+            print(f'::{annotation_type}::{result} - {line.strip()}')
 
 
 def Compile(Project: ASProject.ASProject, BuildPIP: bool) -> CompilationResult:
