@@ -142,9 +142,8 @@ def Compile(Project: ASProject.ASProject, BuildPIP: bool) -> CompilationResult:
         pilFile = open(pilPath, "w", encoding='utf-8')
         pilFile.write(pilContents)
         pilFile.close()
-        # pviTransferPath = os.path.join(
-        #     __PVIpath, 'PVI', 'Tools', 'PVITransfer', 'PVITransfer.exe')
-        pviTransferPath = "C:\Program Files (x86)\BRAutomation\PVI6\PVI\Tools\PVITransfer\PVITransfer.exe"
+        pviTransferPath = os.path.join(
+            __PVIpath, 'PVI', 'Tools', 'PVITransfer', 'PVITransfer.exe')
         pipCommand = pviTransferPath + ' -silent ' + '-consoleOutput "' + \
             pilPath + '" -' + os.path.join(__projectPath, "PVITransfer.log")
         print(f'Executing command: {pipCommand}')
