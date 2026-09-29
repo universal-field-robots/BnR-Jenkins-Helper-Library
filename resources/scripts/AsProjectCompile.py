@@ -53,7 +53,7 @@ class CompilationResult:
         self.security_risks = security_risks
 
 
-def PrintErrorsAndWarnings(output):
+def PrintErrorsAndWarnings(output: list[str]) -> None:
     """Prints errors and warnings in a format that GitHub Actions can recognize as annotations."""
     for line in output:
         annotation_matches = re.search(annotation_regex, line)
@@ -98,23 +98,27 @@ def Compile(Project: ASProject.ASProject, BuildPIP: bool) -> CompilationResult:
     __projectPath: str = Project._projectDir
     __compileAsPath: str = InstalledAS.ASInstallPath(Project)
     __PVIpath: str = InstalledAS.PVIPath()
+    config: ASProject.ASConfiguration = next(iter(Project._configurations))
     if __compileAsPath == '':
         print('no compatible AS installed')
         return CompilationResult('', 3, 0, 0, 0)  # Return error code 3 for build error
 
     print(f'Building configuration {Project._configurations[config]._name}.')
-    with subprocess.Popen(f'{os.path.join(__compileAsPath, "Bin-en", "BR.AS.Build.exe")}  "{
-            os.path.join(__projectPath, Project.projectName)} " -buildMode "Build" -buildRUCPackage', cwd=__projectPath, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as result:
-        for output in result.stdout:
-            PrintErrorsAndWarnings([output])
-    result.wait()
 
     errors, security_risks, warnings = 0, 0, 0
-    finalResult = finalResultRegex.search(result.stdout.read())
-    if finalResult:
-        errors = int(finalResult.group(1))
-        security_risks = int(finalResult.group(2))
-        warnings = int(finalResult.group(3))
+
+    buildCommand = f'"{os.path.join(__compileAsPath, "Bin-en", "BR.AS.Build.exe")}" "{
+        os.path.join(__projectPath, Project.projectName)}" -buildMode "Rebuild" -buildRUCPackage'
+    with subprocess.Popen(buildCommand, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as result:
+        for output in result.stdout:
+            PrintErrorsAndWarnings([output])
+
+            finalResult = finalResultRegex.search(output)
+            if finalResult:
+                errors = int(finalResult.group(1))
+                security_risks = int(finalResult.group(2))
+                warnings = int(finalResult.group(3))
+    result.wait()
 
     if result.returncode == 3:
         print(f'Building configuration {Project._configurations[config]._name} failed.')
@@ -122,7 +126,8 @@ def Compile(Project: ASProject.ASProject, BuildPIP: bool) -> CompilationResult:
             Project._configurations[config]._name, 3, errors, warnings, security_risks)
 
     if BuildPIP:
-        print(f'Creating PIP for configuration {Project._configurations[config]._name}')
+        print(
+            f'------------- Creating PIP for configuration {Project._configurations[config]._name} -------------')
         # create PIP
         rucPackagePath = os.path.join(
             __projectPath, Project._configurations[config].BinariesDirectory(),
@@ -133,17 +138,24 @@ def Compile(Project: ASProject.ASProject, BuildPIP: bool) -> CompilationResult:
         pilPath = os.path.join(__projectPath, "CreatePIP.pil")
         # Create a PIP using PVITransfer
         # TODO: Check that these are the best install modes and restrictions
-        pilContents = 'OfflineUpdate "' + rucPackagePath + '", "Network", "InstallMode=ForceReboot InstallRestriction=AllowInitialInstallation KeepPVValues=1 ExecuteInitExit=0 IgnoreVersion=1 AllowDowngrade=0", "Default", "DestinationDirectory=\'' + pipPath + '\'"'
+        pilContents = 'OfflineUpdate "' + rucPackagePath + '", "UsbStick", "InstallMode=ForceReboot InstallRestriction=AllowPartitioning KeepPVValues=1 ExecuteInitExit=0 IgnoreVersion=1 AllowDowngrade=0", "DestinationDirectory=\'' + pipPath + '\'"'
         pilFile = open(pilPath, "w", encoding='utf-8')
         pilFile.write(pilContents)
         pilFile.close()
-        pviTransferPath = os.path.join(
-            __PVIpath, 'PVI', 'Tools', 'PVITransfer', 'PVITransfer.exe')
-        pipCommand = pviTransferPath + ' -silent "' + '-consoleOutput' + pilPath + '"'
-        pipResult = subprocess.run(pipCommand, cwd=__projectPath,
-                                   capture_output=True, text=True, check=False)
-        PrintErrorsAndWarnings(pipResult.stdout.splitlines())
-        # PVITransfer reports failures in its own log rather than on stdout.
+        # pviTransferPath = os.path.join(
+        #     __PVIpath, 'PVI', 'Tools', 'PVITransfer', 'PVITransfer.exe')
+        pviTransferPath = "C:\Program Files (x86)\BRAutomation\PVI6\PVI\Tools\PVITransfer\PVITransfer.exe"
+        pipCommand = pviTransferPath + ' -silent ' + '-consoleOutput "' + \
+            pilPath + '" -' + os.path.join(__projectPath, "PVITransfer.log")
+        print(f'Executing command: {pipCommand}')
+        with subprocess.Popen(pipCommand, cwd=__projectPath,
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as pipResult:
+            for output in pipResult.stdout:
+                PrintErrorsAndWarnings([output])
+        pipResult.wait()
+        # read the PVITransfer.log file and print errors and warnings
+        with open(os.path.join(__projectPath, "PVITransfer.log"), 'r', encoding='utf-8') as logFile:
+            PrintErrorsAndWarnings(logFile.readlines())
         if os.path.isdir(pipPath) == False:
             print(
                 f'Creating PIP for configuration {Project._configurations[config]._name} failed.')
@@ -158,14 +170,6 @@ def Compile(Project: ASProject.ASProject, BuildPIP: bool) -> CompilationResult:
         Project._configurations[config]._name, result.returncode, errors, warnings, security_risks)
 
 
-def parse_bool(s: str) -> bool:
-    """Parse a string as a boolean value."""
-    try:
-        return {'true': True, 'false': False}[s.lower()]
-    except KeyError as exc:
-        raise argparse.ArgumentTypeError(s) from exc
-
-
 def main() -> None:
     """Parse command-line arguments, compile the project, and set the exit code."""
     parser = argparse.ArgumentParser()
@@ -176,7 +180,7 @@ def main() -> None:
                         dest='maxWarnings', required=False, default=-1)
     parser.add_argument(
         '-b', '--buildpip', help='Builds the Project Installation Package', dest='BuildPIP',
-        required=False, action='store_true')
+        required=False, default=False, action="store_true")
     args = parser.parse_args()
 
     project = ASProject.ASProject(args.projectDir)
